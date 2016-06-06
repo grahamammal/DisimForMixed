@@ -145,6 +145,71 @@ calcCondProb <- function(myDataAll){
 
 
 
+#' Calculate Distance  Between given Attribute Values by considering only a pair of attributes.
+#'
+#' Takes in two lists Ai and Aj, representing values of two attributes, two values x and y from Ai.
+#' Quantitative attributes are accepted only after descretization. Calculates distance between x and y
+#' for Aj with respect to Ai.
+#' @param Ai A list consisting values of a selected attribute
+#' @param Aj A list consisting values of another selected attribute
+#' @param x Value from Ai
+#' @param y Another value from Ai
+#' @details findMax is the implementation of find_max() function proposed by Ahmad & Dey (2007).
+#' See Ahmad & Dey (2007) for more datails.
+#' @return distance between x and y for Aj with respect to Ai.
+#' @references Ahmad, A., & Dey, L. (2007). A k-mean clustering algorithm for mixed numeric and categorical data. Data & Knowledge Engineering, 63(2), 503-527.
+#' @examples
+#' Attrib_i <- c("A","B","A","C")
+#' Attrib_j <- c("Q","Q","R","Q")
+#' xVal <- "A"
+#' yVal <- "B"
+#' QualiVars <- data.frame(Qlvar1 = c("A","B","A","C"), Qlvar2 = c("Q","Q","R","Q"))
+#' library(dplyr)
+#' distBetXY <- findMax(Attrib_i,Attrib_j,xVal,yVal)
+#' @export
+
+
+
+findMax <- function(Ai, Aj, x, y){
+
+  dist_xy = 0
+  levelsOfAj <- data.frame(levels(as.factor(Aj)))
+  NofAj <- nrow(levelsOfAj)
+  ConditioanalProbs <- calcCondProb(data.frame(Ai,Aj))
+  filteredCP = data.frame()
+  for (i in 1:NofAj){
+    filteredCPi <-  dplyr::filter(ConditioanalProbs, ConditioanalProbs$occur == as.character(levelsOfAj[i,1]) & (ConditioanalProbs$given == x | ConditioanalProbs$given == y) & ConditioanalProbs$jVal == 2)
+    filteredCP <- rbind(filteredCP,filteredCPi)
+  }
+  for(t in 1:NofAj){
+    jGivx = 100
+    jGivy = 100
+    for (k in 1:nrow(filteredCP)){
+      if(as.character(filteredCP$occur[k]) == as.character(levelsOfAj[t,1]) & as.character(filteredCP$given[k]) == x){
+        jGivx <- filteredCP$condProbVal[k]
+      }
+      if(as.character(filteredCP$occur[k]) == as.character(levelsOfAj[t,1]) & as.character(filteredCP$given[k]) == y){
+        jGivy <- filteredCP$condProbVal[k]
+      }
+      if(jGivx != 100 & jGivy != 100){
+        break
+      }
+    }
+
+    if(jGivx >= jGivy){
+      dist_xy = dist_xy + jGivx
+    }else{
+      dist_xy = dist_xy + jGivy
+    }
+  }
+  dist_xy <- dist_xy - 1
+
+  return(dist_xy)
+
+}
+
+
+
 #' Calculate Distance  Between Attribute Values.
 #'
 #' Takes in a data frame which contains only qualitative variables. Discretized quantitative variables
@@ -175,59 +240,40 @@ calcCondProb <- function(myDataAll){
 
 
 
-distBetPairs <- function(myDataAll){
 
-  #library(dplyr)
+
+distBetPairs <- function(myDataAll){
 
   DistData <- data.frame()
   NoOfVars <- ncol(myDataAll)
-  ConditioanalProbs <- calcCondProb(myDataAll)
-
   for(i in 1:NoOfVars){
-
     levelsOfDataFirst <- data.frame(levels(as.factor(myDataAll[,i])))
     NofFirst <- nrow(levelsOfDataFirst)
-
-    for (j in 1:NofFirst){
-
-      for (k in j+1:NofFirst){
-        a = 1
-        DistBetPair_ia <- data.frame()
-
-        while(a <= NoOfVars){
-          if(a == i)
-            a = a + 1
-
-          if(a > NoOfVars)
-            break
-
-          filterForX <-  dplyr::filter(ConditioanalProbs, ConditioanalProbs$jVal == a & ConditioanalProbs$condProbVal != 0 & ConditioanalProbs$given == as.character(levelsOfDataFirst[j,1]))
-          wVals <- data.frame(filterForX$occur)
-          filterForY <- dplyr::filter(ConditioanalProbs, ConditioanalProbs$jVal == a & ConditioanalProbs$given == as.character(levelsOfDataFirst[k,1]))
-          b = 1
-          while(b <= nrow(wVals)){
-            filterForY <- dplyr::filter(filterForY, filterForY$occur != as.character(wVals[b,1]))
-            b = b + 1
+    jStop <- NofFirst-1
+    for (j in 1:jStop){
+      aStart <- j + 1
+      for (a in aStart:NofFirst){
+        SumProb <- 0
+        k=1
+        while(k <= NoOfVars){
+          if(k != i){
+            distXY <- findMax(as.character(myDataAll[,i]), as.character(myDataAll[,k]), as.character(levelsOfDataFirst[j,1]), as.character(levelsOfDataFirst[a,1]))
+            SumProb <- SumProb + distXY
           }
-          SumConPropX <- sum(filterForX$condProbVal) + sum(filterForY$condProbVal) - 1
-          DistBetPair_ia <- rbind(DistBetPair_ia, SumConPropX)
-          a = a + 1
+          k = k + 1
         }
-
         VarIndex <- i
         xVal <- levelsOfDataFirst[j,1]
-        yVal <- levelsOfDataFirst[k,1]
-        DistBetPair <- mean(DistBetPair_ia[,1])
+        yVal <- levelsOfDataFirst[a,1]
+        DistBetPair <- SumProb/(NoOfVars-1)
+        newRowToBind <- data.frame(VarIndex, xVal, yVal)
         newRowToBind <- data.frame(VarIndex, xVal, yVal, DistBetPair)
         DistData <- rbind(DistData, newRowToBind)
-        DistData <- dplyr::filter(DistData, is.na(yVal) == FALSE)
       }
     }
   }
   return(DistData)
 }
-
-
 
 
 
