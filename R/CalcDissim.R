@@ -356,26 +356,30 @@ signifOfQuantVars <- function(myDataQuali, myDataQuant){
 
 
 
-calcDissimMat <- function(myDataQuali, myDataQuant){
+calcDissimMat <- function(myDataQuali, myDataQuant = NULL){
 
   #library(dplyr)
 
-  dissimForQuant <- data.frame()
+
   dissimForQuali <- data.frame()
   dissimForAll <- data.frame()
   disSimForAttr <- numeric(0)
   NoOfObj <- nrow(myDataQuali)
-  NoClolQuant <- ncol(myDataQuant)
   NoClolQuali <- ncol(myDataQuali)
-
-  SignfDataFound <- signifOfQuantVars(myDataQuali, myDataQuant)
-
-  for (a in 1:NoOfObj){
-    for (b in 1:NoOfObj){
-      for (i in 1:NoClolQuant){
-        disSimForAttr[i] <- (SignfDataFound[i,2]*(myDataQuant[a,i] - myDataQuant[b,i]))^2
+  
+  
+  if(!is.null(myDataQuant)) {
+    dissimForQuant <- data.frame()
+    NoClolQuant <- ncol(myDataQuant)
+    SignfDataFound <- signifOfQuantVars(myDataQuali, myDataQuant)
+  
+    for (a in 1:NoOfObj){
+      for (b in 1:NoOfObj){
+        for (i in 1:NoClolQuant){
+          disSimForAttr[i] <- (SignfDataFound[i,2]*(myDataQuant[a,i] - myDataQuant[b,i]))^2
+        }
+        dissimForQuant[a,b] <- sum(disSimForAttr)
       }
-      dissimForQuant[a,b] <- sum(disSimForAttr)
     }
   }
 
@@ -397,9 +401,13 @@ calcDissimMat <- function(myDataQuali, myDataQuant){
       dissimForQuali[a,b] <- sum(disSimForAttr)
     }
   }
-  dissimForAll <- dissimForQuant[,] + dissimForQuali[,]
+  
+  if(!is.null(myDataQuant)) {
+    dissimForAll <- dissimForQuant[,] + dissimForQuali[,]
+  } else {
+    dissimForAll <- dissimForQuali[,]
+  }
 
-  agnesClustering <- cluster::agnes(dissimForAll, diss = TRUE, method = "ward")
 
   return(dissimForAll)
 }
